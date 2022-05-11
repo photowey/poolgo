@@ -51,15 +51,20 @@ func NewGoroutineExecutorPool(poolSize, maxTaskQueueSize int) GoroutineExecutor 
 					fmt.Println("the taskQueue is closed")
 					return
 				} else {
+					// pool.Execute()
 					if task.runnable != nil {
 						task.runnable(task.ctx)
 					}
+
+					// pool.Submit()
 					if task.callable != nil {
 						result := task.callable(task.ctx)
-						if _, ok := <-task.resultCh; ok { // TODO judge the result channel closed?
-							task.resultCh <- result
-						} else {
-							fmt.Println("the resultCh is closed")
+						if task.resultCh != nil { // usable here?
+							if _, ok := <-task.resultCh; ok { // TODO judge the result channel closed?
+								task.resultCh <- result
+							} else {
+								fmt.Println("the resultCh is closed")
+							}
 						}
 					}
 				}
