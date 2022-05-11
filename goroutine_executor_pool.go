@@ -3,6 +3,7 @@ package poolgo
 import (
 	`context`
 	`errors`
+	`fmt`
 )
 
 var _ GoroutineExecutor = (*GoroutineExecutorPool)(nil)
@@ -32,21 +33,22 @@ func NewTaskc(task Callable, ctx context.Context, ch chan any) (*Task, error) {
 type GoroutineExecutorPool struct {
 	poolSize         int
 	maxTaskQueueSize int
-	asyncTaskQueue   chan Task
+	taskQueue        chan Task
 }
 
 func NewGoroutineExecutorPool(poolSize, maxTaskQueueSize int) GoroutineExecutor {
 	pool := &GoroutineExecutorPool{
 		poolSize:         poolSize,
 		maxTaskQueueSize: maxTaskQueueSize,
-		asyncTaskQueue:   make(chan Task),
+		taskQueue:        make(chan Task, maxTaskQueueSize),
 	}
 
 	for i := 0; i < pool.poolSize; i++ {
 		go func() {
 			for {
-				task, notClosed := <-pool.asyncTaskQueue
+				task, notClosed := <-pool.taskQueue
 				if !notClosed {
+					fmt.Println("the taskQueue is closed")
 					return
 				} else {
 					if task.runnable != nil {
@@ -54,7 +56,11 @@ func NewGoroutineExecutorPool(poolSize, maxTaskQueueSize int) GoroutineExecutor 
 					}
 					if task.callable != nil {
 						result := task.callable(task.ctx)
-						task.resultCh <- result
+						if _, ok := <-task.resultCh; ok { // TODO judge the result channel closed?
+							task.resultCh <- result
+						} else {
+							fmt.Println("the resultCh is closed")
+						}
 					}
 				}
 			}
@@ -65,8 +71,8 @@ func NewGoroutineExecutorPool(poolSize, maxTaskQueueSize int) GoroutineExecutor 
 }
 
 func (pool *GoroutineExecutorPool) Execute(task Runnable, ctx context.Context) error {
-	if pool.asyncTaskQueue != nil {
-		pool.asyncTaskQueue <- NewTaskr(task, ctx)
+	if pool.taskQueue != nil {
+		pool.taskQueue <- NewTaskr(task, ctx)
 	} else {
 		return errors.New("async runnable task queue is not enabled")
 	}
@@ -75,13 +81,13 @@ func (pool *GoroutineExecutorPool) Execute(task Runnable, ctx context.Context) e
 }
 
 func (pool *GoroutineExecutorPool) Submit(task Callable, ctx context.Context) (Future, error) {
-	if pool.asyncTaskQueue != nil {
+	if pool.taskQueue != nil {
 		ch := make(chan any)
 		taskc, err := NewTaskc(task, ctx, ch)
 		if err != nil {
 			return nil, err
 		}
-		pool.asyncTaskQueue <- *taskc
+		pool.taskQueue <- *taskc
 		return NewFuture(ch), nil
 	} else {
 		return nil, errors.New("async callable task queue is not enabled")
