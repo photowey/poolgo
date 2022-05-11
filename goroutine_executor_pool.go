@@ -60,11 +60,7 @@ func NewGoroutineExecutorPool(poolSize, maxTaskQueueSize int) GoroutineExecutor 
 					if task.callable != nil {
 						result := task.callable(task.ctx)
 						if task.resultCh != nil { // usable here?
-							if _, ok := <-task.resultCh; ok { // TODO judge the result channel closed?
-								task.resultCh <- result
-							} else {
-								fmt.Println("the resultCh is closed")
-							}
+							task.resultCh <- result // how to judge whether the channel has been closed?
 						}
 					}
 				}
