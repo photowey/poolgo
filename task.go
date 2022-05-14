@@ -1,8 +1,10 @@
 package poolgo
 
 import (
-	`context`
+	"context"
 )
 
-type Runnable func(ctx context.Context)
-type Callable func(ctx context.Context) any
+type (
+	Runnable func(ctx context.Context)
+	Callable func(ctx context.Context) any
+)

@@ -17,13 +17,13 @@
 package poolgo_test
 
 import (
-	`context`
-	`fmt`
-	`reflect`
-	`testing`
-	`time`
+	"context"
+	"fmt"
+	"reflect"
+	"testing"
+	"time"
 
-	`github.com/photowey/poolgo`
+	"github.com/photowey/poolgo"
 )
 
 func TestGoroutineExecutorPool_Execute(t *testing.T) {

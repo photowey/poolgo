@@ -15,3 +15,8 @@
  */
 
 package poolgo
+
+// NewSinglePool - create a pool with a single goroutine
+func NewSinglePool() GoroutineExecutor {
+	return NewGoroutineExecutorPool(1)
+}

@@ -17,46 +17,66 @@
 package poolgo
 
 import (
-	`context`
-	`errors`
-	`fmt`
+	"context"
+	"errors"
+	"fmt"
 )
 
 var _ GoroutineExecutor = (*GoroutineExecutorPool)(nil)
 
 type Task struct {
+	ctx      context.Context
 	runnable Runnable
 	callable Callable
 	resultCh chan any
-	ctx      context.Context
-}
-
-func NewTaskr(task Runnable, ctx context.Context) Task {
-	return Task{
-		runnable: task, ctx: ctx,
-	}
-}
-
-func NewTaskc(task Callable, ctx context.Context, ch chan any) (*Task, error) {
-	if task == nil {
-		return nil, errors.New("async runnable task queue is not enabled")
-	}
-	return &Task{
-		callable: task, ctx: ctx, resultCh: ch,
-	}, nil
 }
 
 type GoroutineExecutorPool struct {
-	poolSize         int
-	maxTaskQueueSize int
-	taskQueue        chan Task
+	poolSize  int
+	maxSize   int
+	taskQueue chan Task
 }
 
-func NewGoroutineExecutorPool(poolSize, maxTaskQueueSize int) GoroutineExecutor {
+func (pool *GoroutineExecutorPool) Execute(task Runnable, ctx context.Context) error {
+	if pool.taskQueue != nil {
+		pool.taskQueue <- NewTaskr(ctx, task)
+	} else {
+		return errors.New("async runnable task queue is not enabled")
+	}
+
+	return nil
+}
+
+func (pool *GoroutineExecutorPool) Submit(task Callable, ctx context.Context) (Future, error) {
+	if pool.taskQueue != nil {
+		ch := make(chan any)
+		taskc, err := NewTaskc(ctx, task, ch)
+		if err != nil {
+			return nil, err
+		}
+		pool.taskQueue <- *taskc
+		return NewFuture(ch), nil
+	} else {
+		return nil, errors.New("async callable task queue is not enabled")
+	}
+}
+
+func NewGoroutineExecutorPool(poolSize int, maxSizes ...int) GoroutineExecutor {
+	max := -1
+	switch len(maxSizes) {
+	case 1:
+		max = maxSizes[0]
+	}
+
 	pool := &GoroutineExecutorPool{
-		poolSize:         poolSize,
-		maxTaskQueueSize: maxTaskQueueSize,
-		taskQueue:        make(chan Task, maxTaskQueueSize),
+		poolSize: poolSize,
+		maxSize:  max,
+	}
+
+	if max < 0 {
+		pool.taskQueue = make(chan Task)
+	} else {
+		pool.taskQueue = make(chan Task, max)
 	}
 
 	for i := 0; i < pool.poolSize; i++ {
@@ -92,26 +112,20 @@ func NewGoroutineExecutorPool(poolSize, maxTaskQueueSize int) GoroutineExecutor 
 	return pool
 }
 
-func (pool *GoroutineExecutorPool) Execute(task Runnable, ctx context.Context) error {
-	if pool.taskQueue != nil {
-		pool.taskQueue <- NewTaskr(task, ctx)
-	} else {
-		return errors.New("async runnable task queue is not enabled")
+func NewTaskr(ctx context.Context, task Runnable) Task {
+	return Task{
+		ctx:      ctx,
+		runnable: task,
 	}
-
-	return nil
 }
 
-func (pool *GoroutineExecutorPool) Submit(task Callable, ctx context.Context) (Future, error) {
-	if pool.taskQueue != nil {
-		ch := make(chan any)
-		taskc, err := NewTaskc(task, ctx, ch)
-		if err != nil {
-			return nil, err
-		}
-		pool.taskQueue <- *taskc
-		return NewFuture(ch), nil
-	} else {
-		return nil, errors.New("async callable task queue is not enabled")
+func NewTaskc(ctx context.Context, task Callable, ch chan any) (*Task, error) {
+	if task == nil {
+		return nil, errors.New("async runnable task queue is not enabled")
 	}
+	return &Task{
+		ctx:      ctx,
+		callable: task,
+		resultCh: ch,
+	}, nil
 }
