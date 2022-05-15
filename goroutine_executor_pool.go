@@ -94,7 +94,7 @@ func (pool GoroutineExecutorPool) fire() {
 		for {
 			task, notClosed := <-pool.taskQueue
 			if !notClosed {
-				pool.logger.Warnf("the taskQueue is closed")
+				pool.logger.Warnf("the taskQueue is %s", "closed")
 				return
 			} else {
 				// pool.Execute()
@@ -108,7 +108,7 @@ func (pool GoroutineExecutorPool) fire() {
 					if task.out != nil { // usable here?
 						select {
 						case <-task.ctx.Done():
-							pool.logger.Warnf("the task ctx is closed")
+							pool.logger.Warnf("the task ctx is %s", "closed")
 						default:
 							task.out <- result
 						}
@@ -140,7 +140,7 @@ func NewGoroutineExecutorPool(poolSize int, opts ...Option) GoroutineExecutor {
 
 	pool.start()
 
-	pool.logger.Infof("start the goroutine pool successfully...")
+	pool.logger.Infof("start the goroutine pool %s...", "successfully")
 
 	return pool
 }
