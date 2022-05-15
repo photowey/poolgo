@@ -70,15 +70,15 @@ func (log *logger) colorLevel(level int) string {
 }
 
 func (log *logger) Infof(template string, args ...any) {
-	log.log(InfoLevel, template, args)
+	log.log(InfoLevel, template, args...)
 }
 
 func (log *logger) Warnf(template string, args ...any) {
-	log.log(WarnLevel, template, args)
+	log.log(WarnLevel, template, args...)
 }
 
 func (log *logger) Errorf(template string, args ...any) {
-	log.log(ErrorLevel, template, args)
+	log.log(ErrorLevel, template, args...)
 }
 
 func (log *logger) log(level int, message string, args ...any) {
