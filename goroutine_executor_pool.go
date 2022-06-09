@@ -107,7 +107,7 @@ func (pool GoroutineExecutorPool) fire() {
 					result := task.worker.call()
 					if task.out != nil { // usable here?
 						select {
-						case <-task.ctx.Done():
+						case <-task.worker.ctx.Done():
 							pool.logger.Warnf("the task ctx is %s", "closed")
 						default:
 							task.out <- result

@@ -20,10 +20,17 @@ import (
 	"context"
 	"fmt"
 	"reflect"
+	"runtime"
 	"testing"
 	"time"
 
 	"github.com/photowey/poolgo"
+)
+
+const (
+	_ = 1 << (10 * iota)
+	KB
+	MB
 )
 
 func TestGoroutineExecutorPool_Execute(t *testing.T) {
@@ -61,12 +68,18 @@ func TestGoroutineExecutorPool_Execute(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			pool := poolgo.NewGoroutineExecutorPool(tt.fields.poolSize, tt.fields.maxTaskQueueSize)
+			pool := poolgo.NewGoroutineExecutorPool(tt.fields.poolSize, poolgo.WithMaxSize(tt.fields.maxTaskQueueSize))
 			if err := pool.Execute(tt.args.task, tt.args.ctx); (err != nil) != tt.wantErr {
 				t.Errorf("Execute() error = %v, wantErr %v", err, tt.wantErr)
 			}
 
 			time.Sleep(4 * time.Second)
+
+			var costMem uint64
+			mem := runtime.MemStats{}
+			runtime.ReadMemStats(&mem)
+			costMem = mem.TotalAlloc/KB - costMem
+			t.Logf("memory usage:%d KB", costMem)
 		})
 	}
 }
@@ -105,7 +118,7 @@ func TestGoroutineExecutorPool_Submit(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			pool := poolgo.NewGoroutineExecutorPool(tt.fields.poolSize, tt.fields.maxTaskQueueSize)
+			pool := poolgo.NewGoroutineExecutorPool(tt.fields.poolSize, poolgo.WithMaxSize(tt.fields.maxTaskQueueSize))
 			future, err := pool.Submit(tt.args.task, tt.args.ctx)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Submit() error = %v, wantErr %v", err, tt.wantErr)
@@ -120,6 +133,12 @@ func TestGoroutineExecutorPool_Submit(t *testing.T) {
 			if !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("Submit() got = %v, want %v", got, tt.want)
 			}
+
+			var costMem uint64
+			mem := runtime.MemStats{}
+			runtime.ReadMemStats(&mem)
+			costMem = mem.TotalAlloc/KB - costMem
+			t.Logf("memory usage:%d KB", costMem)
 		})
 	}
 }
