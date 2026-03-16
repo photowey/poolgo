@@ -16,8 +16,61 @@
 
 package poolgo_test
 
-//
-// The example of poolgo
-//
+import (
+	"context"
+	"errors"
+	"fmt"
+	"log"
 
-// TODO
+	"github.com/photowey/poolgo"
+)
+
+func ExampleNewGoroutineExecutorPool() {
+	pool, err := poolgo.NewGoroutineExecutorPool(2, poolgo.WithQueueSize(4), poolgo.WithLogger(poolgo.NewDiscardLogger()))
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer pool.Shutdown(context.Background())
+
+	future, err := poolgo.SubmitTyped[string](pool, func(ctx context.Context) (string, error) {
+		return "ok", nil
+	}, context.Background())
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	result, err := future.Await(context.Background())
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	fmt.Println(result)
+	// Output:
+	// ok
+}
+
+func ExampleWithPanicHandler() {
+	pool, err := poolgo.NewGoroutineExecutorPool(
+		1,
+		poolgo.WithLogger(poolgo.NewDiscardLogger()),
+		poolgo.WithPanicHandler(func(info poolgo.PanicInfo) error {
+			return errors.New("task failed")
+		}),
+	)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer pool.Shutdown(context.Background())
+
+	future, err := pool.Submit(func(ctx context.Context) any {
+		panic("boom")
+	}, context.Background())
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	_, err = future.Await(context.Background())
+	fmt.Println(err)
+	// Output:
+	// task failed
+}

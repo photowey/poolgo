@@ -16,7 +16,12 @@
 
 package poolgo
 
-// NewSinglePool - create a pool with a single goroutine
-func NewSinglePool() GoroutineExecutor {
-	return NewGoroutineExecutorPool(1)
+// NewSinglePool creates a pool with a single worker.
+func NewSinglePool(opts ...Option) (GoroutineExecutor, error) {
+	return NewGoroutineExecutorPool(1, opts...)
+}
+
+// MustNewSinglePool creates a single-worker pool or panics if the config is invalid.
+func MustNewSinglePool(opts ...Option) GoroutineExecutor {
+	return MustNewGoroutineExecutorPool(1, opts...)
 }

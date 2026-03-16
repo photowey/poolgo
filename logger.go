@@ -31,6 +31,7 @@ type Record struct {
 	LineNo   int
 }
 
+// Logger emits pool lifecycle and error messages.
 type Logger interface {
 	Infof(template string, args ...any)
 	Warnf(template string, args ...any)
@@ -94,13 +95,14 @@ func (log *logger) log(level int, message string, args ...any) {
 	_ = log.loggerTemplate.Execute(log.output, record)
 }
 
+// NewLogger creates a color-aware logger that writes to w.
 func NewLogger(w io.Writer) Logger {
 	loggerFormat := `{{Now "2006-01-02 15:04:05.999"}} {{.Level}} ▶ {{.ID}} {{.Message}}{{EndLine}}`
 	funcs := template.FuncMap{
 		"Now":     Now,
 		"EndLine": EndLine,
 	}
-	loggerTemplate, _ := template.New("logger").Funcs(funcs).Parse(loggerFormat)
+	loggerTemplate := template.Must(template.New("logger").Funcs(funcs).Parse(loggerFormat))
 
 	return &logger{
 		loggerTemplate: loggerTemplate,
@@ -108,10 +110,17 @@ func NewLogger(w io.Writer) Logger {
 	}
 }
 
+// NewDiscardLogger returns a logger that drops all output.
+func NewDiscardLogger() Logger {
+	return NewLogger(io.Discard)
+}
+
+// Now formats the current time using the provided layout.
 func Now(layout string) string {
 	return time.Now().Format(layout)
 }
 
+// EndLine returns a platform-neutral line separator for logger templates.
 func EndLine() string {
 	return "\n"
 }

@@ -16,8 +16,27 @@
 
 package poolgo
 
+// Package poolgo provides a lightweight goroutine pool with graceful shutdown,
+// context-aware submission, typed async helpers, and recoverable task execution semantics.
 //
-// The doc of poolgo
+// The package is designed for internal service code that needs a small,
+// predictable worker pool rather than a general-purpose scheduling framework.
 //
-
-// TODO
+// Recommended usage:
+//
+//   - create one pool per component or service subsystem
+//   - prefer SubmitTyped for tasks that return values
+//   - call Shutdown during service teardown
+//   - pass bounded contexts when submitting work to avoid indefinite queue waits
+//
+// Lifecycle semantics:
+//
+//   - running: accepts new work
+//   - shutting_down: rejects new work and drains accepted tasks
+//   - stopped: all workers have exited
+//
+// Panic semantics:
+//
+//   - task panics are recovered
+//   - recovered panics are converted into errors via the configured PanicHandler
+//   - worker capacity is preserved after a panic

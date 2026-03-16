@@ -20,7 +20,10 @@ import (
 	"context"
 )
 
+// GoroutineExecutor exposes pool-backed task execution and lifecycle control.
 type GoroutineExecutor interface {
 	Executor
 	Submit(task Callable, ctx context.Context) (Future, error)
+	Shutdown(ctx context.Context) error
+	State() PoolState
 }

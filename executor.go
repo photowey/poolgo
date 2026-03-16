@@ -20,6 +20,7 @@ import (
 	"context"
 )
 
+// Executor executes fire-and-forget tasks.
 type Executor interface {
 	Execute(task Runnable, ctx context.Context) error
 }

@@ -18,6 +18,7 @@ package poolgo
 
 import (
 	"context"
+	"sync"
 )
 
 const (
@@ -26,52 +27,83 @@ const (
 
 var _ Future = (*future)(nil)
 
-// AwaitFunc a func of await
+// AwaitFunc awaits an asynchronously produced value.
 type AwaitFunc func(ctx context.Context) (any, error)
 
-// AwaitFuncFactory a factory of AwaitFunc
+// AwaitFuncFactory builds an AwaitFunc from a result channel.
 type AwaitFuncFactory func(ch chan any) AwaitFunc
 
-// Future async/await programming model
+// Future represents an untyped asynchronous result.
+// Prefer TypedFuture with SubmitTyped for new code.
 type Future interface {
 	Await(ctxs ...context.Context) (any, error)
 }
 
 type future struct {
-	resultCh chan any
-	await    AwaitFunc
+	done   chan struct{}
+	once   sync.Once
+	result any
+	err    error
 }
 
-// Await sync, await
-func (f future) Await(ctxs ...context.Context) (any, error) {
-	ctx := context.Background() // default: ctx
+// Await blocks until the future resolves or the provided context is canceled.
+func (f *future) Await(ctxs ...context.Context) (any, error) {
+	ctx := context.Background()
 	switch len(ctxs) {
 	case single:
-		ctx = ctxs[0]
-	}
-
-	return f.await(ctx)
-}
-
-// CreateAwaitFunc a func of AwaitFuncFactory
-func CreateAwaitFunc(ch chan any) AwaitFunc {
-	return func(ctx context.Context) (any, error) {
-		select {
-		case <-ctx.Done():
-			return nil, ctx.Err()
-		case result := <-ch:
-			defer func() {
-				close(ch)
-				// ch <- Task{} // panic: send on closed channel
-			}()
-			return result, nil
+		if ctxs[0] != nil {
+			ctx = ctxs[0]
 		}
 	}
+
+	select {
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	case <-f.done:
+		return f.result, f.err
+	}
 }
 
-func NewFuture(ch chan any) Future {
-	return &future{
-		resultCh: ch,
-		await:    CreateAwaitFunc(ch),
+// CreateAwaitFunc creates a channel-backed AwaitFunc.
+// Deprecated: prefer Submit or SubmitTyped instead of building futures from channels directly.
+func CreateAwaitFunc(ch chan any) AwaitFunc {
+	f := NewFuture(ch)
+	return func(ctx context.Context) (any, error) {
+		return f.Await(ctx)
 	}
+}
+
+// NewFuture adapts a legacy result channel into a Future.
+// Deprecated: prefer Submit or SubmitTyped instead of channels.
+func NewFuture(ch chan any) Future {
+	f := newFuture()
+	if ch == nil {
+		f.resolve(nil, ErrNilFutureChannel)
+		return f
+	}
+
+	go func() {
+		result, ok := <-ch
+		if !ok {
+			f.resolve(nil, ErrFutureChannelClosed)
+			return
+		}
+		f.resolve(result, nil)
+	}()
+
+	return f
+}
+
+func newFuture() *future {
+	return &future{
+		done: make(chan struct{}),
+	}
+}
+
+func (f *future) resolve(result any, err error) {
+	f.once.Do(func() {
+		f.result = result
+		f.err = err
+		close(f.done)
+	})
 }
